@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.x'
+          cache: true
+      - name: Install FFmpeg development libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential git nasm pkg-config libx264-dev libpng-dev
+          ffmpeg_root="$RUNNER_TEMP/ffmpeg"
+          git clone --depth 1 --branch n9.0 https://github.com/FFmpeg/FFmpeg "$RUNNER_TEMP/ffmpeg-src"
+          cd "$RUNNER_TEMP/ffmpeg-src"
+          ./configure --prefix="$ffmpeg_root" --enable-libx264 --enable-gpl --disable-programs --disable-doc --disable-debug
+          make -j"$(nproc)"
+          make install
+          echo "PKG_CONFIG_PATH=$ffmpeg_root/lib/pkgconfig" >> "$GITHUB_ENV"
+          echo "CGO_CFLAGS=-I$ffmpeg_root/include" >> "$GITHUB_ENV"
+          echo "CGO_LDFLAGS=-L$ffmpeg_root/lib" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=$ffmpeg_root/lib" >> "$GITHUB_ENV"
+      - name: Install FFmpeg development libraries
+        if: runner.os == 'macOS'
+        run: |
+          brew install ffmpeg pkg-config
+          echo "PKG_CONFIG_PATH=$(brew --prefix ffmpeg)/lib/pkgconfig" >> "$GITHUB_ENV"
+      - name: Check formatting
+        run: test -z "$(gofmt -l *.go cmd/archorg-dl/*.go)"
+      - name: Test
+        run: go test ./...
+      - name: Race test
+        run: go test -race ./...
+      - name: Vet
+        run: go vet ./...

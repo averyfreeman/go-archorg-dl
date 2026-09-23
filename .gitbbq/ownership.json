@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "files": {
+    ".agents/mattpocock/DEPENDENCY.yaml": "70e8e46dbb5313b0295f768dce893a8c0d8f0c810ba0a524bafdf370f8b0fb8c",
+    ".agents/skills/githabits/SKILL.md": "85f491fd358075a58696c9ba91f6804b29b421af01cadf9848f70480230908c5",
+    ".agents/skills/go/SKILL.md": "2cee8aafa54a65034e55b303079ac1379d1b9a482ef0a7d3dfff8968a39814a6",
+    ".gitbbq-manifest.yaml": "696f67efc717106cbebb1f92637a5ad106fb32432571c99509e2d3acc1df0c30",
+    ".gitbbq/.gitignore": "bea45574d15b3fc3d5218fd2dad6e66bdb9fba6b57867ede863383ec55219ebe",
+    ".gitbbq/hooks.json": "602df880af8a1daa40beb0b19586bf3c2423c6db52c825316218be8ef5059f17",
+    ".gitbbq/session.json": "9163434d057dc62412eaa62cfe00230456505a43bee89128db1a069d7ecedc44",
+    ".githabits.yaml": "b1511e3909f8d76332b1f8fd38d59df487217ab9f37204f2597a1c83a5f74e96",
+    "AGENTS.md": "74db8dce1dc04ee060d41665c09890935e9f4960cce6ab78779bdaf84d2b1411",
+    "CONTEXT-MAP.md": "a3db2d4a98382b184fed7c5f4a5ba1eec9ed9a8f55f2b762f6996bc92c73a7ac",
+    "CONTEXT.md": "c51cba3c3a39799f9fb1e2b03a30339ca01fe1aaa15efcb175db5a206092b8ad",
+    "architecture-contract.yaml": "efa4b452150cc3d5a53a3814af68680f9374d2b7bda0e1094613f2de54a2ab00",
+    "docs/adr/index.json": "a4c5f9282f39fdb50714687022755fbf1d4909fa0eb118b321289913a0f75576",
+    "implementation-plan.md": "5afbcc43bdd39e5b4a44df9862131df16e855e64fb49f3e64397931876d292b8"
+  }
+}

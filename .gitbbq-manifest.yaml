@@ -1,0 +1,18 @@
+schema_version: 1.0.0
+version: 1
+project_name: go-archorg-dl
+problem: Download one complete television program from an Archive.org details URL using metadata-first discovery, resumable Go HTTP downloads, bounded concurrent fallback segments, and in-process FFmpeg assembly.
+languages:
+    - go
+matt:
+    repository: https://github.com/mattpocock/skills.git
+    commit: c55ee46073ed923f86ce59a5eb3b6d895095d1b7
+    path: .agents/mattpocock
+hooks:
+    enabled: true
+    required:
+        - UserPromptSubmit
+        - PreToolUse
+        - PostToolUse
+        - PostCompact
+        - Stop

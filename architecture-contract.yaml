@@ -1,0 +1,9 @@
+schema_version: 1.0.0
+revision: 1
+scope: go-archorg-dl
+problem: Download one complete television program from an Archive.org details URL using metadata-first discovery, resumable Go HTTP downloads, bounded concurrent fallback segments, and in-process FFmpeg assembly.
+languages:
+    - go
+adr_files:
+    - docs/adr/0001-go-owned-media-downloads.md
+    - docs/adr/0002-astiav-concat-remux.md
