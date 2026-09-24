@@ -15,6 +15,8 @@ type segmentExtractor interface {
 
 type ytdlpExtractor struct {
 	executable string
+	workdir    string
+	verbosity  int
 }
 
 func (e ytdlpExtractor) Resolve(ctx context.Context, urls []string) ([]string, error) {
@@ -24,10 +26,14 @@ func (e ytdlpExtractor) Resolve(ctx context.Context, urls []string) ([]string, e
 	command := ytdlp.New().
 		NoUpdate().
 		NoPlaylist().
-		NoWarnings().
 		SkipDownload().
 		DumpJSON().
 		Format("best[ext=mp4]/best")
+	if e.verbosity >= maxVerbosity {
+		command.Verbose()
+	} else {
+		command.NoWarnings()
+	}
 	if e.executable != "" {
 		command.SetExecutable(e.executable)
 	} else {
@@ -37,9 +43,24 @@ func (e ytdlpExtractor) Resolve(ctx context.Context, urls []string) ([]string, e
 		}
 		command.SetExecutable(resolved.Executable)
 	}
-	result, err := command.Run(ctx, urls...)
-	if err != nil {
-		return nil, fmt.Errorf("extract segment URLs with yt-dlp: %w", err)
+	result, runErr := command.Run(ctx, urls...)
+	if result != nil {
+		captured := processResult{
+			Executable: result.Executable,
+			Args:       result.Args,
+			ExitCode:   result.ExitCode,
+			Stdout:     result.Stdout,
+			Stderr:     result.Stderr,
+		}
+		if e.workdir != "" {
+			if err := persistProcessResult(e.workdir, "yt-dlp", captured); err != nil {
+				return nil, fmt.Errorf("save yt-dlp diagnostics: %w", err)
+			}
+		}
+		logRawProcessResult(e.verbosity, "yt-dlp", captured)
+	}
+	if runErr != nil {
+		return nil, fmt.Errorf("extract segment URLs with yt-dlp: %w", runErr)
 	}
 	info, err := result.GetExtractedInfo()
 	if err != nil {

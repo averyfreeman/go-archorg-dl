@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0.0",
-  "generated_at": "2026-09-23T12:35:26.098308Z",
-  "decision_count": 2,
+  "generated_at": "2026-09-23T23:02:12.395573Z",
+  "decision_count": 3,
   "decisions": [
     {
       "number": 1,
@@ -9,15 +9,23 @@
       "status": "accepted",
       "filename": "0001-go-owned-media-downloads.md",
       "path": "docs/adr/0001-go-owned-media-downloads.md",
-      "body": "---\nstatus: accepted\n---\n\n# Use Go-owned media downloads behind library adapters\n\nThe downloader uses Archive.org metadata and native Go HTTP for the primary MP4 path, then invokes one metadata-only extraction pass through go-ytdlp when segmented fallback is required. The project owns retries, Range resume, `.part` files, checksums, worker cancellation, and publication; go-ytdlp is deliberately limited to resolving progressive URLs. This preserves the Python behavior while keeping direct subprocess calls out of project code. A strict zero-child-process implementation would require replacing yt-dlp with a native Archive.org resolver.\n\n## Considered options\n\n- Use yt-dlp for every download: rejected because it would surrender resume, checksum, and worker ownership to the extractor.\n- Reimplement Archive.org extraction natively: deferred because yt-dlp already handles the fallback URL shape and compatibility surface.\n"
+      "body": "---\nstatus: accepted\n---\n\n# Use Go-owned media downloads behind library adapters\n\nThe downloader uses Archive.org metadata and native Go HTTP for the primary MP4 path, then invokes one metadata-only extraction pass through go-ytdlp when segmented fallback is required. The project owns retries, Range resume, `.part` files, checksums, worker cancellation, and publication; go-ytdlp is deliberately limited to resolving progressive URLs. The separate FFmpeg assembly process is specified by ADR 0003 and is not delegated to go-ytdlp.\n\n## Considered options\n\n- Use yt-dlp for every download: rejected because it would surrender resume, checksum, and worker ownership to the extractor.\n- Reimplement Archive.org extraction natively: deferred because yt-dlp already handles the fallback URL shape and compatibility surface.\n"
     },
     {
       "number": 2,
       "title": "Assemble progressive segments with astiav and FFmpeg concat",
-      "status": "accepted",
+      "status": "superseded by ADR-0003",
       "filename": "0002-astiav-concat-remux.md",
       "path": "docs/adr/0002-astiav-concat-remux.md",
-      "body": "---\nstatus: accepted\n---\n\n# Assemble progressive segments with astiav and FFmpeg concat\n\nSegment files are assembled through FFmpeg's concat demuxer and stream-copy remux API exposed by go-astiav, producing an MP4 without an FFmpeg subprocess. This is preferred over a custom packet timestamp muxer or a pure-Go progressive MP4 joiner because the input files carry audio/video timing and container details that FFmpeg already understands. The final assembly remains ordered and serial; only segment downloads are concurrent.\n\n## Consequences\n\n- The build requires CGO, FFmpeg 9 development headers/libraries, and pkg-config.\n- Segment streams must be compatible enough for concat demuxing and stream copy; the implementation does not transcode incompatible media.\n- Pure-Go alternatives such as go-mp4 or mp4ff remain possible future replacements but are not the v0.1.0 path.\n"
+      "body": "---\nstatus: superseded by ADR-0003\n---\n\n# Assemble progressive segments with astiav and FFmpeg concat\n\nSuperseded by [ADR 0003](0003-system-ffmpeg-concat.md).\n\nSegment files are assembled through FFmpeg's concat demuxer and stream-copy remux API exposed by go-astiav, producing an MP4 without an FFmpeg subprocess. This is preferred over a custom packet timestamp muxer or a pure-Go progressive MP4 joiner because the input files carry audio/video timing and container details that FFmpeg already understands. The final assembly remains ordered and serial; only segment downloads are concurrent.\n\n## Consequences\n\n- The build requires CGO, FFmpeg 9 development headers/libraries, and pkg-config.\n- Segment streams must be compatible enough for concat demuxing and stream copy; the implementation does not transcode incompatible media.\n- Pure-Go alternatives such as go-mp4 or mp4ff remain possible future replacements but are not the v0.1.0 path.\n"
+    },
+    {
+      "number": 3,
+      "title": "Assemble progressive segments with the system FFmpeg concat process",
+      "status": "accepted",
+      "filename": "0003-system-ffmpeg-concat.md",
+      "path": "docs/adr/0003-system-ffmpeg-concat.md",
+      "body": "---\nstatus: accepted\n---\n\n# Assemble progressive segments with the system FFmpeg concat process\n\nSegment files are assembled by invoking the verified system `ffmpeg` executable with a retained `filelist.txt` concat manifest. The command uses stream-copy remuxing to an MP4 partial file and publishes that file atomically after a successful process exit. Standard output, standard error, command arguments, exit status, manifest, and partial output remain in the fallback work directory so a failed assembly can be inspected and retried. This replaces the astiav implementation from ADR 0002 because the system binary is already available and provides the most direct diagnostic path.\n\nThe downloader continues to own Segment discovery, bounded concurrent downloads, resume behavior, work retention, and publication. It does not transcode incompatible Segment streams; FFmpeg remains responsible for the concat demuxer and stream-copy compatibility checks.\n"
     }
   ]
 }

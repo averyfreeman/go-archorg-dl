@@ -12,8 +12,8 @@
     "AGENTS.md": "74db8dce1dc04ee060d41665c09890935e9f4960cce6ab78779bdaf84d2b1411",
     "CONTEXT-MAP.md": "a3db2d4a98382b184fed7c5f4a5ba1eec9ed9a8f55f2b762f6996bc92c73a7ac",
     "CONTEXT.md": "c51cba3c3a39799f9fb1e2b03a30339ca01fe1aaa15efcb175db5a206092b8ad",
-    "architecture-contract.yaml": "efa4b452150cc3d5a53a3814af68680f9374d2b7bda0e1094613f2de54a2ab00",
-    "docs/adr/index.json": "a4c5f9282f39fdb50714687022755fbf1d4909fa0eb118b321289913a0f75576",
-    "implementation-plan.md": "5afbcc43bdd39e5b4a44df9862131df16e855e64fb49f3e64397931876d292b8"
+    "architecture-contract.yaml": "b17fc25d12a879ee29fed01b3464f5bcb33fb77a6329bea12f37e7ff9e811f9c",
+    "docs/adr/index.json": "993eb6db22ce9d3eca956263584549958af5560ba8cb029d7df2c73eb99624de",
+    "implementation-plan.md": "52c3a9f1ffa6006c78c8f428840dd0dd9adcaf3766abbff1cbc98a5d6b9b3782"
   }
 }

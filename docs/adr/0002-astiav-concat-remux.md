@@ -1,8 +1,10 @@
 ---
-status: accepted
+status: superseded by ADR-0003
 ---
 
 # Assemble progressive segments with astiav and FFmpeg concat
+
+Superseded by [ADR 0003](0003-system-ffmpeg-concat.md).
 
 Segment files are assembled through FFmpeg's concat demuxer and stream-copy remux API exposed by go-astiav, producing an MP4 without an FFmpeg subprocess. This is preferred over a custom packet timestamp muxer or a pure-Go progressive MP4 joiner because the input files carry audio/video timing and container details that FFmpeg already understands. The final assembly remains ordered and serial; only segment downloads are concurrent.
 

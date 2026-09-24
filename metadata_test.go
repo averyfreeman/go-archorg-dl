@@ -14,6 +14,7 @@ func TestParseArchiveURL(t *testing.T) {
 		good bool
 	}{
 		{name: "valid query", url: "https://archive.org/details/Show_20260101_010000?q=ignored", want: "Show_20260101_010000", good: true},
+		{name: "valid trailing media path", url: "https://archive.org/details/Show_20260101_010000/Show_20260101_010000.mp4/start/0/end/300?ignore=x.mp4#player", want: "Show_20260101_010000", good: true},
 		{name: "http rejected", url: "http://archive.org/details/show", good: false},
 		{name: "wrong path rejected", url: "https://archive.org/download/show", good: false},
 		{name: "unsafe identifier rejected", url: "https://archive.org/details/not.valid", good: false},

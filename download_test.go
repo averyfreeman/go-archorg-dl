@@ -86,6 +86,28 @@ func TestFileDownloaderResumesRange(t *testing.T) {
 	}
 }
 
+func TestFileDownloaderOverwritesExistingDestination(t *testing.T) {
+	directory := t.TempDir()
+	destination := filepath.Join(directory, "program.mp4")
+	if err := os.WriteFile(destination, []byte("old"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	client := responseClient{fn: func(request *http.Request) (*http.Response, error) {
+		if request.Header.Get("Range") != "" {
+			t.Fatalf("unexpected range request: %s", request.Header.Get("Range"))
+		}
+		return response(http.StatusOK, "new", nil), nil
+	}}
+	downloader := fileDownloader{client: client, retries: 0}
+	if err := downloader.download(context.Background(), "https://example.invalid/program.mp4", destination, nil, "", "", true, true); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(destination)
+	if err != nil || string(got) != "new" {
+		t.Fatalf("destination = %q, %v", got, err)
+	}
+}
+
 func TestDownloadSegmentsBoundsConcurrencyAndPreservesOrder(t *testing.T) {
 	var active, maximum atomic.Int32
 	var mu sync.Mutex
@@ -112,7 +134,7 @@ func TestDownloadSegmentsBoundsConcurrencyAndPreservesOrder(t *testing.T) {
 		{Index: 2, Start: 2, End: 3, URL: "https://example.invalid/2"},
 		{Index: 3, Start: 3, End: 4, URL: "https://example.invalid/3"},
 	}
-	paths, err := downloadSegments(context.Background(), &downloader, segments, t.TempDir(), 2, true)
+	paths, err := downloadSegments(context.Background(), &downloader, segments, t.TempDir(), 2, true, true, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,6 +149,31 @@ func TestDownloadSegmentsBoundsConcurrencyAndPreservesOrder(t *testing.T) {
 		if string(data) != "/"+strconv.Itoa(i) {
 			t.Fatalf("path %d contains %q", i, data)
 		}
+	}
+}
+
+func TestDownloadSegmentsReusesExistingFilesWhenRequested(t *testing.T) {
+	workdir := t.TempDir()
+	existing := filepath.Join(workdir, "00000.mp4")
+	if err := os.WriteFile(existing, []byte("existing"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	called := false
+	client := responseClient{fn: func(request *http.Request) (*http.Response, error) {
+		called = true
+		return response(http.StatusOK, "replacement", nil), nil
+	}}
+	downloader := fileDownloader{client: client, retries: 0}
+	segments := []segment{{Index: 0, Start: 0, End: 1, URL: "https://example.invalid/0"}}
+	paths, err := downloadSegments(context.Background(), &downloader, segments, workdir, 1, true, false, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if called {
+		t.Fatal("existing segment was downloaded despite reuse request")
+	}
+	if len(paths) != 1 || paths[0] != existing {
+		t.Fatalf("paths = %#v", paths)
 	}
 }
 

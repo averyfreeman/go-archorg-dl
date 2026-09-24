@@ -67,8 +67,8 @@ func parseArchiveURL(raw string) (archiveURL, error) {
 		return archiveURL{}, errors.New("URL must be an https://archive.org/details/{identifier} URL")
 	}
 	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
-	if len(parts) != 2 || parts[0] != "details" {
-		return archiveURL{}, errors.New("URL must point to exactly one Archive.org item")
+	if len(parts) < 2 || parts[0] != "details" {
+		return archiveURL{}, errors.New("URL must point to an Archive.org details item")
 	}
 	identifier, err := url.PathUnescape(parts[1])
 	if err != nil || !archiveIdentifierPattern.MatchString(identifier) {

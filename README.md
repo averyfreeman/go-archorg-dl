@@ -2,13 +2,12 @@
 
 `archorg-dl` downloads one complete television Program from an Archive.org details URL.
 
-The downloader follows a metadata-first path. It prefers a complete MP4 and downloads it directly with retries, HTTP Range resume, checksum verification, and atomic publication. If the direct file fails, it resolves time-bounded Segment URLs once through go-ytdlp, downloads those progressive MP4 files concurrently, and assembles them in-process through FFmpeg's concat demuxer using go-astiav.
+The downloader follows a metadata-first path. It prefers a complete MP4 and downloads it directly with retries, HTTP Range resume, checksum verification, and atomic publication. If the direct file fails, it resolves time-bounded Segment URLs once through go-ytdlp, downloads those progressive MP4 files concurrently, and assembles them with the system `ffmpeg` concat demuxer.
 
 ## Requirements
 
 - Go 1.26 or newer
-- FFmpeg 9 development headers and libraries
-- CGO and pkg-config
+- A working `ffmpeg` executable on `PATH` for segmented fallback
 
 On macOS, Homebrew provides the native dependency:
 
@@ -16,7 +15,7 @@ On macOS, Homebrew provides the native dependency:
 brew install ffmpeg
 ```
 
-The FFmpeg binary is not invoked by this project. go-ytdlp is used as a Go adapter for metadata extraction and may manage its own versioned yt-dlp executable/cache. Use `--yt-dlp-path` to provide a specific executable.
+The project invokes the system `ffmpeg` binary only for segmented assembly. go-ytdlp is used as a Go adapter for metadata extraction and may manage its own versioned yt-dlp executable/cache. Use `--yt-dlp-path` to provide a specific executable.
 
 ## Usage
 
@@ -29,18 +28,25 @@ By default the output is `<archive-identifier>.mp4` in the current directory. Us
 
 ```text
 -o, --output-dir DIR       output directory
-    --overwrite            replace an existing output
+    --overwrite            replace existing output and segmented work files (default true)
+    --no-overwrite         refuse to replace an existing published MP4
     --no-resume             discard .part files before downloading
     --duration SECONDS      fallback duration override
     --segment-seconds N     fallback segment length (default: 300)
     --no-segment-fallback   disable segmented fallback
-    --keep-work             retain successful fallback work files
+    --keep-work             retain successful fallback work files (default true)
+    --cleanup-work          remove fallback work files after success
+    --reuse-work            reuse completed fallback segments instead of refreshing them
     --workers N             concurrent Segment downloads (default: NumCPU)
     --yt-dlp-path PATH      use a user-managed yt-dlp executable
--v, --verbose               log progress and retained work paths
+-v, --verbose               increase diagnostic detail; repeat up to -vvv
 ```
 
-A failed fallback retains `.<identifier>.work` so completed Segment files and `.part` files can be diagnosed or resumed. A successful fallback removes that directory unless `--keep-work` is set.
+The input may include additional Archive.org media, range, query, or fragment components after `/details/{identifier}`; the downloader uses the item identifier and derives its own Segment plan.
+
+A failed or successful fallback retains `.<identifier>.work` by default. Existing Segment files are refreshed on the next run while `.part` files resume unless `--no-resume` is set. Use `--reuse-work` to reuse completed Segment files or `--cleanup-work` to remove the work directory after success.
+
+The work directory contains the ordered `filelist.txt`, downloaded Segment files, partial files, and captured `yt-dlp`/`ffmpeg` command, status, stdout, and stderr artifacts. `-v` shows lifecycle and Segment progress, `-vv` adds detailed command information, and `-vvv` also prints raw external-process output.
 
 ## Library use
 
@@ -56,13 +62,14 @@ ctx := context.Background()
 result, err := archorgdl.Download(ctx, archorgdl.Options{
     URL:       "https://archive.org/details/example_item",
     Workers:   0, // runtime.NumCPU()
-    KeepWork:  true,
 })
 if err != nil {
     return err
 }
 fmt.Println(result.OutputPath)
 ```
+
+Library defaults match the CLI: existing published output and fallback Segment files are replaced, fallback work is retained, and verbosity is disabled. Set `NoOverwrite`, `ReuseWork`, `CleanupWork`, or `Verbosity` when a caller needs a different policy.
 
 ## Development
 

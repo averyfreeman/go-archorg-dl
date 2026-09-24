@@ -4,7 +4,7 @@ status: accepted
 
 # Use Go-owned media downloads behind library adapters
 
-The downloader uses Archive.org metadata and native Go HTTP for the primary MP4 path, then invokes one metadata-only extraction pass through go-ytdlp when segmented fallback is required. The project owns retries, Range resume, `.part` files, checksums, worker cancellation, and publication; go-ytdlp is deliberately limited to resolving progressive URLs. This preserves the Python behavior while keeping direct subprocess calls out of project code. A strict zero-child-process implementation would require replacing yt-dlp with a native Archive.org resolver.
+The downloader uses Archive.org metadata and native Go HTTP for the primary MP4 path, then invokes one metadata-only extraction pass through go-ytdlp when segmented fallback is required. The project owns retries, Range resume, `.part` files, checksums, worker cancellation, and publication; go-ytdlp is deliberately limited to resolving progressive URLs. The separate FFmpeg assembly process is specified by ADR 0003 and is not delegated to go-ytdlp.
 
 ## Considered options
 

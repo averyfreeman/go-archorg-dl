@@ -179,7 +179,7 @@ func replaceFile(partial, destination string, overwrite bool) error {
 	return nil
 }
 
-func downloadSegments(ctx context.Context, downloader *fileDownloader, segments []segment, workdir string, workers int, resume bool) ([]string, error) {
+func downloadSegments(ctx context.Context, downloader *fileDownloader, segments []segment, workdir string, workers int, resume, overwrite bool, verbosity int) ([]string, error) {
 	if workers <= 0 {
 		workers = runtime.NumCPU()
 	}
@@ -207,11 +207,25 @@ func downloadSegments(ctx context.Context, downloader *fileDownloader, segments 
 					return
 				}
 				filename := filepath.Join(workdir, fmt.Sprintf("%05d.mp4", current.Index))
-				if info, err := os.Stat(filename); err == nil && info.Size() > 0 {
-					paths[current.Index] = filename
-					continue
+				if !overwrite {
+					if info, err := os.Stat(filename); err == nil && info.Size() > 0 {
+						paths[current.Index] = filename
+						logInfo(verbosity, "reusing segment", "segment", current.Index, "start", current.Start, "end", current.End)
+						continue
+					} else if err == nil {
+						if removeErr := os.Remove(filename); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
+							errMu.Lock()
+							if firstErr == nil {
+								firstErr = fmt.Errorf("remove empty segment %d: %w", current.Index, removeErr)
+								cancel()
+							}
+							errMu.Unlock()
+							return
+						}
+					}
 				}
-				if err := downloader.download(childCtx, current.URL, filename, nil, "", "", resume, false); err != nil {
+				logInfo(verbosity, "downloading segment", "segment", current.Index, "start", current.Start, "end", current.End)
+				if err := downloader.download(childCtx, current.URL, filename, nil, "", "", resume, overwrite); err != nil {
 					errMu.Lock()
 					if firstErr == nil {
 						firstErr = fmt.Errorf("segment %d (%d-%d seconds): %w", current.Index, current.Start, current.End, err)
@@ -221,6 +235,7 @@ func downloadSegments(ctx context.Context, downloader *fileDownloader, segments 
 					return
 				}
 				paths[current.Index] = filename
+				logInfo(verbosity, "segment downloaded", "segment", current.Index, "start", current.Start, "end", current.End)
 			}
 		}
 	}

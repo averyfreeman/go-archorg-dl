@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -14,15 +13,16 @@ import (
 type Options struct {
 	URL               string
 	OutputDir         string
-	Overwrite         bool
+	NoOverwrite       bool
 	NoResume          bool
 	DurationSeconds   *float64
 	SegmentSeconds    int
 	NoSegmentFallback bool
-	KeepWork          bool
+	CleanupWork       bool
+	ReuseWork         bool
 	Workers           int
 	YTDLPPath         string
-	Verbose           bool
+	Verbosity         int
 }
 
 // Result describes the published program file.
@@ -52,9 +52,11 @@ func Download(ctx context.Context, options Options) (Result, error) {
 		return Result{}, wrapError("create output directory", err)
 	}
 	destination := filepath.Join(outputDir, safeFilename(parsedURL.Identifier)+".mp4")
-	if _, err := os.Stat(destination); err == nil && !options.Overwrite {
+	if _, err := os.Stat(destination); err == nil && options.NoOverwrite {
 		return Result{}, fmt.Errorf("%w: %s", ErrOutputExists, destination)
 	}
+	overwrite := !options.NoOverwrite
+	logInfo(options.Verbosity, "resolved Archive.org item", "identifier", parsedURL.Identifier, "output", destination)
 
 	client := &archiveClient{client: newHTTPClient(), retries: defaultRetries, retryDelay: defaultRetryDelay}
 	item, err := client.getItem(ctx, parsedURL.Identifier)
@@ -76,11 +78,10 @@ func Download(ctx context.Context, options Options) (Result, error) {
 	downloader := &fileDownloader{client: newHTTPClient(), retries: defaultRetries, retryDelay: defaultRetryDelay}
 
 	if candidate.isMP4() {
-		if options.Verbose {
-			slog.Default().Info("downloading complete MP4", "file", candidate.Name)
-		}
-		err = downloader.download(ctx, sourceURL, destination, candidate.Size, candidate.MD5, candidate.SHA1, !options.NoResume, options.Overwrite)
+		logInfo(options.Verbosity, "downloading complete MP4", "file", candidate.Name)
+		err = downloader.download(ctx, sourceURL, destination, candidate.Size, candidate.MD5, candidate.SHA1, !options.NoResume, overwrite)
 		if err == nil {
+			logInfo(options.Verbosity, "published MP4", "path", destination)
 			return Result{OutputPath: destination, Identifier: parsedURL.Identifier}, nil
 		}
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, ErrOutputExists) {
@@ -89,9 +90,7 @@ func Download(ctx context.Context, options Options) (Result, error) {
 		if options.NoSegmentFallback {
 			return Result{}, err
 		}
-		if options.Verbose {
-			slog.Default().Info("direct download failed; trying segmented fallback", "error", err)
-		}
+		logInfo(options.Verbosity, "direct download failed; trying segmented fallback", "error", err)
 	} else if options.NoSegmentFallback {
 		return Result{}, fmt.Errorf("selected video is not an MP4: %s", candidate.Name)
 	}
@@ -107,7 +106,12 @@ func Download(ctx context.Context, options Options) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	extractor := ytdlpExtractor{executable: options.YTDLPPath}
+	workdir := filepath.Join(outputDir, "."+safeFilename(parsedURL.Identifier)+".work")
+	if err := os.MkdirAll(workdir, 0o755); err != nil {
+		return Result{}, wrapError("create fallback work directory", err)
+	}
+	logInfo(options.Verbosity, "preparing segmented fallback", "segments", len(segments), "workdir", workdir)
+	extractor := ytdlpExtractor{executable: options.YTDLPPath, workdir: workdir, verbosity: options.Verbosity}
 	segmentURLs := make([]string, len(segments))
 	for i := range segments {
 		segmentURLs[i] = segments[i].URL
@@ -120,23 +124,23 @@ func Download(ctx context.Context, options Options) (Result, error) {
 		segments[i].URL = resolvedURLs[i]
 	}
 
-	workdir := filepath.Join(outputDir, "."+safeFilename(parsedURL.Identifier)+".work")
-	paths, err := downloadSegments(ctx, downloader, segments, workdir, options.Workers, !options.NoResume)
+	paths, err := downloadSegments(ctx, downloader, segments, workdir, options.Workers, !options.NoResume, !options.ReuseWork, options.Verbosity)
 	if err != nil {
-		if options.Verbose {
-			slog.Default().Error("segmented download failed; work retained", "workdir", workdir, "error", err)
-		}
+		logInfo(options.Verbosity, "segmented download failed; work retained", "workdir", workdir, "error", err)
 		return Result{}, err
 	}
-	if err := assembleSegments(ctx, paths, destination, workdir, options.Overwrite); err != nil {
-		if options.Verbose {
-			slog.Default().Error("assembly failed; work retained", "workdir", workdir, "error", err)
-		}
+	if err := assembleSegments(ctx, paths, destination, workdir, overwrite, options.Verbosity); err != nil {
+		logInfo(options.Verbosity, "assembly failed; work retained", "workdir", workdir, "error", err)
 		return Result{}, err
 	}
-	if !options.KeepWork {
-		_ = os.RemoveAll(workdir)
+	if options.CleanupWork {
+		if err := os.RemoveAll(workdir); err != nil {
+			logInfo(options.Verbosity, "unable to remove fallback work directory", "workdir", workdir, "error", err)
+		}
+	} else {
+		logInfo(options.Verbosity, "fallback work retained", "workdir", workdir)
 	}
+	logInfo(options.Verbosity, "published MP4", "path", destination)
 	return Result{OutputPath: destination, Identifier: parsedURL.Identifier, UsedSegmentFallback: true}, nil
 }
 
@@ -152,6 +156,9 @@ func validateOptions(options Options) error {
 	}
 	if options.Workers < 0 {
 		return errors.New("workers must not be negative")
+	}
+	if options.Verbosity < 0 || options.Verbosity > maxVerbosity {
+		return fmt.Errorf("verbosity must be between 0 and %d", maxVerbosity)
 	}
 	if options.Workers == 0 && runtime.NumCPU() < 1 {
 		return errors.New("runtime reported no CPUs")

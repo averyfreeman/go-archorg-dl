@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-func TestAstiavAssembly(t *testing.T) {
+func TestFFmpegAssembly(t *testing.T) {
 	fixture := os.Getenv("ARCHORG_MP4_FIXTURE")
 	if fixture == "" {
 		t.Skip("set ARCHORG_MP4_FIXTURE to a small progressive MP4 fixture")
@@ -30,7 +30,7 @@ func TestAstiavAssembly(t *testing.T) {
 		}
 	}
 	output := filepath.Join(workdir, "assembled.mp4")
-	if err := assembleSegments(context.Background(), []string{segmentOne, segmentTwo}, output, workdir, false); err != nil {
+	if err := assembleSegments(context.Background(), []string{segmentOne, segmentTwo}, output, workdir, true, 0); err != nil {
 		t.Fatal(err)
 	}
 	info, err := os.Stat(output)
